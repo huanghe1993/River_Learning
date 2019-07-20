@@ -1,0 +1,4 @@
+# Spring的BeanFactory和ApplicationContext
+
+从ApplicationContext应用容器中获取bean和从beanFactory中获取bean有什么区别？
+

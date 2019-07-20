@@ -1,0 +1,104 @@
+# 触发器
+
+[TOC]
+
+
+
+触发器（TRIGGER）是Mysql的数据库对象之一，该对象与编程语言中的函数非常的类似，都是需要声明执行的。但是触发器的执行不是由程序调用，也不是手工启动，而是由事件来触发的；
+
+为什么需要使用数据库触发器呢？
+
+- 在学生表中拥有字段学生名字，字段学生总数，每当添加一条关于学生记录时，学生的总数就必须要同时的改变
+- 在顾客信息表中拥有字段顾客名字，字段顾客电话和字段顾客的地址缩写，每当添加一条顾客记录时，都需要检查电话号码格式是否正确，顾客地址缩写是否正确
+
+虽然上述的业务逻辑不同但是他们也是共同之处，即都需要在表发生更该时，自动的进行一些处理。这时就可以使用触发器处理数据库对象，例如，对于第一个操作，可以创建一个触发器对象，每次添加一条学生记录时，就执行一次计算学生总数的的操作,这样就可以保证每次添加一条学生记录后，学生的总数与学生记录数一致。MYSQL在触发如下语句的时候，会自动的执行设置的操作
+
+- delete
+- insert
+- update
+
+其他的sql语句是不会激活触发器的。在具体的应用中，之所以使用触发器数据库对象，是由于该对象能加强数据库表中数据的完整性约束和业务规则等。
+
+## 二、创建触发器
+
+### 2.1、创建一条带执行语句的触发器
+
+在MYSQL中创建触发器使用的是SQL语句中CREATE TRIGGER来实现的，其语法形式如下
+
+```sql
+create trigger trigger_name
+	BEFORE|AFTER trigger_EVENT
+		ON TABLE_NAME FOR EACH ROW trigger_STMT;
+```
+
+trigger_name:创建触发器的名称
+
+before|after:表示的是触发器创建的时间，before值得是在触发事情之前触发语句
+
+trigger_EVENT:表示的是触发事件，即触发执行的条件 UPDATE DELETE INSERT语句
+
+table_name:触发事件操作表的名字
+
+FOR EACH ROW:参数表示任何一条记录上的操作满足触发事件都会触发该触发器
+
+trigger_STMT:表示的是激活触发器后被执行的语句
+
+
+
+下面通过一个具体的实例来说明如何创建触发器：
+
+在数据库company中存在着两张表对象：部门表和日志表，创建触发器实现在向部门表中插入记录时，就会在插入之前向日志表中插入当前时间：
+
+```sql
+ CREATE TRIGGER tri_diarytime
+ 	BEFORE INSERT
+ 		ON t_dept FOR EACH ROW
+ 			INSERT INTO t_diary VALUES(NULL,'t_dept',now())
+```
+
+【代码说明】上述语句创建了触发器tri_diarytime,当向部门表中插入任意的一条数据的时候，就会在插入操作之前向表t_diary中插入当前的时间记录
+
+为了检验效果，可以向t_dept中插入任意的一条记录时，就会在插入操作之前向表t_diary中插入当前时间操作
+
+```sql
+INSERT INTO t_dept VALUES(1,"cjgongdept","ShangXi");
+
+SELECT * FROM t_diary;
+```
+
+
+
+### 2.2、创建多条触发语句
+
+其语法形式如下：
+
+```sql
+create trigger trigger_name
+	BEFORE|AFTER trigger_EVENT
+		ON TABLE_NAME FOR EACH ROW
+        BEGIN
+        trigger_STMT
+        END;
+```
+
+多了两个关键字BEGIN和END,在这两个关键字之间所要执行的多个语句的内容，执行语句之间使用分号隔开
+
+在MYSQL的语句中，通常是使用分号作为语句的结束符号，可是在创建触发器时，需要用到分号作为执行语句的结束符号。为了解决该问题，可以使用关键字DELIMITER语句，例如使用“DELIMITER$$”语句，可以用来将结束符设置为  `$ $`
+
+```sql
+DELIMITER $$
+CREATE TRIGGER tri_diarytime2
+	AFTER INSERT
+		ON t_dept FOR　EACH ROW
+		BEGIN
+			INSERT INTO t_diary VALUES(NULL,'t_dept',now());
+			INSERT INTO t_diary VALUES(NULL,'t_dept',now());
+		END
+		$$
+DELIMITER;
+```
+
+开始的时候通过DELIMITER语句将`;`设置结束符号为`$ $`,然后在BEGIN和END之间执行语句列表，最后通过DELIMITER语句将结束符号还原为默认的结束符号`;`。
+
+
+

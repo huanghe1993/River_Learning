@@ -1,0 +1,197 @@
+# ThreadLocal
+
+[TOC]
+
+
+
+## 概述：
+
+字面意思是就是非常的明显，意为“线程局部变量”，线程之间出现安全问题大部分的时候是由于共享资源导致的，有了ThreadLoacl也可以使用它来解决线程安全问题；ThreadLocal相当于是每一个线程有它的局部变量，比如说：数据库连接池，session都可以使用ThreadLocal进行管理，数据库连接池每一个线程都有一个连接，所以这个连接对这个线程来讲是独立的，所以我们可以使用ThreadLocal进行管理的；
+
+## 一个简单的示例
+
+
+
+```java
+public class ThreadLocalDemo1 {
+
+    private ThreadLocal<Integer> count = new ThreadLocal<Integer>(){
+        @Override
+        protected Integer initialValue() {
+            return new Integer(0);
+        }
+    };
+
+    public int getNext() {
+        Integer value = count.get();
+        value++;
+        count.set(value);
+        return value;
+    }
+
+    public static void main(String[] args) {
+
+        ThreadLocalDemo1 d = new ThreadLocalDemo1();
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    System.out.println(Thread.currentThread().getName()+" "+d.getNext());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
+
+
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    System.out.println(Thread.currentThread().getName()+" "+d.getNext());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
+
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                while (true) {
+                    System.out.println(Thread.currentThread().getName()+" "+d.getNext());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+            }
+        }).start();
+
+
+    }
+}
+```
+
+## 源码分析
+
+get（）方法源码分析
+
+```java
+// ThreadLocal.java
+public T get() {
+    	//获取到当前的线程，因为我们说ThreadLocal是属于单个线程的局部变量
+        Thread t = Thread.currentThread();
+        //根据当前的线程获取到ThreadLocalMap
+        ThreadLocalMap map = getMap(t);
+        if (map != null) {
+            //通过ThreadLocal获取到Entry ,这里的this就是ThreadLocal(ThreadLocalMap),从上面讲就是count
+            ThreadLocalMap.Entry e = map.getEntry(this);
+            if (e != null) {
+                @SuppressWarnings("unchecked")
+                T result = (T)e.value;
+                return result;
+            }
+        }
+       //如果没有ThreadLocalMap就是初始化
+        return setInitialValue();
+    }
+```
+
+根据当前的线程获取到ThreadLocalMap  getMap(t);
+
+```java
+//ThreadLocal.java   
+ThreadLocalMap getMap(Thread t) {
+       //根据当前线程的threadLocals属性，ThreadLocals是Thread里面ThreadLocalMap
+       //得到的是每一个自己的线程里面的ThreadLocalMap
+        return t.threadLocals;
+    }
+```
+
+Thread.java
+
+```java
+//Thread.java
+ThreadLocal.ThreadLocalMap threadLocals = null;
+```
+
+ThreadLocalMap类是Thread类的静态内部类
+
+```java
+//Thread.java
+static class ThreadLocalMap {
+
+      //Entry是ThreadLocalMap里面的静态内部类
+      //Entry扩展了WeakReference，而是接受了两个参数
+      //第一个参数是ThreadLocal 第二个参数是 object
+      //这也是为什么可以通过ThreadLocal获取到ThreadLocalMap的原理
+      //这里可以和HashMap做比较，Entry存放的是key value的形式
+      //只不过是这里的key是ThreadLoacl value是自己的值
+        static class Entry extends WeakReference<ThreadLocal<?>> {
+            /** The value associated with this ThreadLocal. */
+            Object value;
+
+            Entry(ThreadLocal<?> k, Object v) {
+                super(k);
+                value = v;
+            }
+        }
+```
+
+map.getEntry();
+
+```java
+//同样是和HashMap做比较，这里可以通过ThreadLoacl获取到Entry
+private Entry getEntry(ThreadLocal<?> key) {
+            int i = key.threadLocalHashCode & (table.length - 1);
+            Entry e = table[i];
+            if (e != null && e.get() == key)
+                return e;
+            else
+                return getEntryAfterMiss(key, i, e);
+        }
+```
+
+setInitialValue();
+
+```java
+ 
+private T setInitialValue() {
+       //这个方法就是在上面额示例中重写的方法
+        T value = initialValue();
+      	//得到当前的线程
+        Thread t = Thread.currentThread();
+      	//得到ThreadLocalMap
+        ThreadLocalMap map = getMap(t);
+        //如果map不为空就把当前的值设置进去，key为当前线程对象,this就是ThreadLocal
+        if (map != null)
+            map.set(this, value);
+        else
+            //创建map
+            createMap(t, value);
+        return value;
+    }
+```
+
+创建map
+
+```java
+ void createMap(Thread t, T firstValue) {
+        //this 表示的是Thread
+        t.threadLocals = new ThreadLocalMap(this, firstValue);
+    }
+```
+
+**从get的源码角度分析，当每个线程初次进行get()操作的时候，会创建一个各自的ThreadLocalMap，它的key为当前的线程，值为初始化的值；以后再进行get操作的时候，首先会获得当前的线程，然后调用getMap(thread)方法获取到当前线程绑定的ThreadLocalMap对象，然后从ThreadLocalMap对象获取到相应的ThreadLocal 对应的value。**
+
